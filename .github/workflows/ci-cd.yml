@@ -29,25 +29,16 @@ jobs:
           
           echo "✅ All tests passed!"
 
-  auto-merge:
+   auto-merge:
     needs: test
-    if: success() && github.ref == 'refs/heads/development'  # ← ADD CONDITION
+    if: success()
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Create Pull Request
+        uses: repo-sync/pull-request@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: master  # ← CHECKOUT MASTER FIRST
-
-      - name: Auto-merge to Master
-        run: |
-          echo "🚀 Tests passed! Auto-merging to master..."
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@users.noreply.github.com"
-          
-          # Merge development into master
-          git merge origin/development --no-ff -m "CI: Auto-merge after tests passed [skip ci]"
-          
-          git push origin master
-          echo "✅ Successfully merged to master!"
+          destination_branch: "master"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          pr_title: "Auto-merge: CI Tests Passed"
+          pr_body: "Automatically merged after all CI tests passed"
+          pr_reviewer: "saahen-sriyan-mishra"
