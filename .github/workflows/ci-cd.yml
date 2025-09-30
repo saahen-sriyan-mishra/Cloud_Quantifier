@@ -11,7 +11,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # ← ADD THIS: Get full git history
+          fetch-depth: 0
 
       - name: Setup Docker
         run: |
@@ -20,25 +20,33 @@ jobs:
 
       - name: Build and Test
         run: |
-          echo "🏗️ Building Docker images..."
+          echo "Building Docker images..."
           docker-compose build
-          
-          echo "🧪 Running test suite..."
-          # Use exit-code-from to properly fail the step
+          echo "Running test suite..."
           docker-compose up --build --exit-code-from test test
-          
-          echo "✅ All tests passed!"
+          echo " All tests passed!"
 
-   auto-merge:
+  auto-merge:
     needs: test
     if: success()
     runs-on: ubuntu-latest
     steps:
-      - name: Create Pull Request
-        uses: repo-sync/pull-request@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          destination_branch: "master"
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          pr_title: "Auto-merge: CI Tests Passed"
-          pr_body: "Automatically merged after all CI tests passed"
-          pr_reviewer: "saahen-sriyan-mishra"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@users.noreply.github.com"
+
+      - name: Fetch and Merge
+        run: |
+          echo "Tests passed! Auto-merging to master..."
+          git fetch origin development
+          git checkout master
+          git merge origin/development --no-ff -m "CI: Auto-merge after tests passed"
+          git push origin master
+          echo "Successfully merged to master!"
