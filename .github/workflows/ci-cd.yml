@@ -4,14 +4,17 @@ on:
   push:
     branches: [ development ]
 
+# ADD THIS PERMISSIONS BLOCK
+permissions:
+  contents: write
+
 jobs:
-  test-and-push:
+  test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Setup Docker
@@ -25,13 +28,26 @@ jobs:
           docker-compose build
           echo "Running test suite..."
           docker-compose up --build --exit-code-from test test
-          echo "All tests passed!"
+          echo " All tests passed!"
 
-      - name: Push to Master
-        if: success()
+  push-to-master:
+    needs: test
+    if: success()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Configure Git
         run: |
-          echo "Tests passed! Pushing to master..."
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@users.noreply.github.com"
+
+      - name: Push to Master
+        run: |
+          echo "Tests passed! Pushing to master..."
           git push origin HEAD:master
           echo "Successfully pushed to master!"
