@@ -37,14 +37,17 @@ function Dashboard() {
   // Fetch stock suggestions based on input
   useEffect(() => {
     const fetchSuggestions = async () => {
-      if (stockName.length > 0) {
+      // If input is empty, treat it as if "A" was typed
+      const searchTerm = stockName.length > 0 ? stockName : "A";
+      
+      // Only fetch suggestions if dropdown should be shown
+      if ((stockName.length > 0 || searchTerm === "A") && showSuggestions) {
         setLoadingSuggestions(true);
         try {
-          const res = await fetch(`/api/stocks/search?q=${stockName}`);
+          const res = await fetch(`/api/stocks/search?q=${searchTerm}`);
           if (res.ok) {
             const suggestions = await res.json();
             setFilteredStocks(suggestions);
-            setShowSuggestions(true);
           }
         } catch (err) {
           console.error("Error fetching suggestions:", err);
@@ -54,13 +57,12 @@ function Dashboard() {
         }
       } else {
         setFilteredStocks([]);
-        setShowSuggestions(false);
       }
     };
 
     const debounceTimer = setTimeout(fetchSuggestions, 300);
     return () => clearTimeout(debounceTimer);
-  }, [stockName]);
+  }, [stockName, showSuggestions]); // Added showSuggestions to dependencies
 
   // Reusable fetch function for stock data
   const fetchStockData = async (stock) => {
@@ -107,17 +109,50 @@ function Dashboard() {
   // Handle form submit
   const handleSubmit = (e) => {
     e.preventDefault();
-    setQuery(stockName.trim());
+    const searchTerm = stockName.trim() || "A";
+    setQuery(searchTerm);
     setShowSuggestions(false);
   };
 
-  // Handle stock selection from dropdown — fetch immediately
+  // Handle stock selection from dropdown
   const handleStockSelect = (stock) => {
     setStockName(stock);
     setQuery(stock);
-    fetchStockData(stock);
-    setShowSuggestions(false);
+    setShowSuggestions(false); // Hide dropdown immediately
   };
+
+  // Handle input focus - show suggestions (empty input will show stocks starting with "A")
+  const handleInputFocus = () => {
+    setShowSuggestions(true);
+  };
+
+  // Handle input change
+  const handleInputChange = (e) => {
+    const value = e.target.value.toUpperCase();
+    setStockName(value);
+    // Always show suggestions when typing, and for empty input it will show "A" stocks
+    setShowSuggestions(true);
+  };
+
+  // Handle click outside to close dropdown
+  const handleClickOutside = (event) => {
+    if (
+      dropdownRef.current && 
+      !dropdownRef.current.contains(event.target) && 
+      inputRef.current && 
+      !inputRef.current.contains(event.target)
+    ) {
+      setShowSuggestions(false);
+    }
+  };
+
+  // Detect click outside dropdown to close it
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Tooltip formatters
   const volumeTooltipFormatter = (value, name) => {
@@ -138,18 +173,13 @@ function Dashboard() {
     setShowLines((prev) => ({ ...prev, [name]: checked }));
   };
 
-  // Detect click outside dropdown to close it
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current && !inputRef.current.contains(event.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  // Get chart title based on current state
+  const getChartTitle = () => {
+    if (loading) return "Loading...";
+    if (error) return "Error loading data";
+    if (!query) return "Select a stock";
+    return `Stock Graph for "${query}"`;
+  };
 
   return (
     <div style={{ maxWidth: 900, margin: "30px auto", padding: 20, position: "relative" }}>
@@ -161,12 +191,8 @@ function Dashboard() {
           type="text"
           placeholder="Enter stock name (e.g. AAPL)"
           value={stockName}
-          onChange={(e) => setStockName(e.target.value.toUpperCase())}
-          onFocus={() => setShowSuggestions(true)}  // Show suggestions when input is focused
-          onBlur={() => { 
-            // Optionally, you could add some delay to hide the dropdown after blur.
-            setTimeout(() => setShowSuggestions(false), 150);
-          }}
+          onChange={handleInputChange}
+          onFocus={handleInputFocus}
           style={{ padding: 8, width: 250, fontSize: 16 }}
         />
         <button
@@ -177,6 +203,7 @@ function Dashboard() {
             fontSize: 16,
             cursor: "pointer",
           }}
+          onClick={() => setShowSuggestions(false)}
         >
           Search
         </button>
@@ -220,53 +247,62 @@ function Dashboard() {
                 </div>
               ))
             ) : (
-              stockName.length > 0 && (
-                <div style={{ padding: "8px 12px", color: "#666" }}>No stocks found</div>
+              (stockName.length > 0 || stockName === "") && (
+                <div style={{ padding: "8px 12px", color: "#666" }}>
+                  {stockName.length > 0 ? "No stocks found" : "Loading stocks starting with 'A'..."}
+                </div>
               )
             )}
           </div>
         )}
       </form>
 
+      {/* Dynamic Chart Title */}
+      <h2 style={{ marginBottom: 20, color: query ? "#333" : "#666", fontStyle: query ? "normal" : "italic" }}>
+        {getChartTitle()}
+      </h2>
+
       {/* Checkboxes to toggle 4 lines */}
-      <div style={{ marginBottom: 20 }}>
-        <label style={{ marginRight: 15 }}>
-          <input
-            type="checkbox"
-            name="open"
-            checked={showLines.open}
-            onChange={handleCheckboxChange}
-          />{" "}
-          Open
-        </label>
-        <label style={{ marginRight: 15 }}>
-          <input
-            type="checkbox"
-            name="close"
-            checked={showLines.close}
-            onChange={handleCheckboxChange}
-          />{" "}
-          Close
-        </label>
-        <label style={{ marginRight: 15 }}>
-          <input
-            type="checkbox"
-            name="high"
-            checked={showLines.high}
-            onChange={handleCheckboxChange}
-          />{" "}
-          High
-        </label>
-        <label style={{ marginRight: 15 }}>
-          <input
-            type="checkbox"
-            name="low"
-            checked={showLines.low}
-            onChange={handleCheckboxChange}
-          />{" "}
-          Low
-        </label>
-      </div>
+      {query && (
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ marginRight: 15 }}>
+            <input
+              type="checkbox"
+              name="open"
+              checked={showLines.open}
+              onChange={handleCheckboxChange}
+            />{" "}
+            Open
+          </label>
+          <label style={{ marginRight: 15 }}>
+            <input
+              type="checkbox"
+              name="close"
+              checked={showLines.close}
+              onChange={handleCheckboxChange}
+            />{" "}
+            Close
+          </label>
+          <label style={{ marginRight: 15 }}>
+            <input
+              type="checkbox"
+              name="high"
+              checked={showLines.high}
+              onChange={handleCheckboxChange}
+            />{" "}
+            High
+          </label>
+          <label style={{ marginRight: 15 }}>
+            <input
+              type="checkbox"
+              name="low"
+              checked={showLines.low}
+              onChange={handleCheckboxChange}
+            />{" "}
+            Low
+          </label>
+        </div>
+      )}
 
       {loading && <p>Loading data...</p>}
       {error && <p style={{ color: "red" }}>Error: {error}</p>}
