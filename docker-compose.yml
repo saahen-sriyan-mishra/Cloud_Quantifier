@@ -16,29 +16,6 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  app:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.development
-      target: development
-    container_name: stocks-app
-    ports:
-      - "3001:3001"
-      - "5000:5000"
-    volumes:
-      - ./app/src:/app/src
-      - ./app/index.html:/app/index.html
-      - stocks_data:/shared-data:ro
-    depends_on:
-      database:
-        condition: service_healthy
-    networks:
-      - app-network
-    environment:
-      - DATABASE_PATH=/shared-data/stocks_data.db
-      - NODE_ENV=development
-    restart: unless-stopped
-
   test:
     build:
       context: .
@@ -51,8 +28,6 @@ services:
     depends_on:
       database:
         condition: service_healthy
-      app:
-        condition: service_started
     networks:
       - app-network
     environment:
