@@ -26,7 +26,7 @@ services:
       - "3001:3001"
       - "5000:5000"
     volumes:
-      - ./app/src:/app/src           # Only mount source code, not node_modules
+      - ./app/src:/app/src
       - ./app/index.html:/app/index.html
       - stocks_data:/shared-data:ro
     depends_on:
@@ -38,6 +38,27 @@ services:
       - DATABASE_PATH=/shared-data/stocks_data.db
       - NODE_ENV=development
     restart: unless-stopped
+
+  test:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.test
+    container_name: stocks-test
+    volumes:
+      - ./tests:/app/tests
+      - ./app/src:/app/src
+      - stocks_data:/shared-data:ro
+    depends_on:
+      database:
+        condition: service_healthy
+      app:
+        condition: service_started
+    networks:
+      - app-network
+    environment:
+      - DATABASE_PATH=/shared-data/stocks_data.db
+      - NODE_ENV=test
+    command: ["npm", "test"]
 
 volumes:
   stocks_data:
