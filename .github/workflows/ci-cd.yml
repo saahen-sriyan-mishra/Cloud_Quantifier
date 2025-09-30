@@ -1,0 +1,53 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ development ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ← ADD THIS: Get full git history
+
+      - name: Setup Docker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
+      - name: Build and Test
+        run: |
+          echo "🏗️ Building Docker images..."
+          docker-compose build
+          
+          echo "🧪 Running test suite..."
+          # Use exit-code-from to properly fail the step
+          docker-compose up --build --exit-code-from test test
+          
+          echo "✅ All tests passed!"
+
+  auto-merge:
+    needs: test
+    if: success() && github.ref == 'refs/heads/development'  # ← ADD CONDITION
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ref: master  # ← CHECKOUT MASTER FIRST
+
+      - name: Auto-merge to Master
+        run: |
+          echo "🚀 Tests passed! Auto-merging to master..."
+          git config --global user.name "GitHub Actions Bot"
+          git config --global user.email "actions@users.noreply.github.com"
+          
+          # Merge development into master
+          git merge origin/development --no-ff -m "CI: Auto-merge after tests passed [skip ci]"
+          
+          git push origin master
+          echo "✅ Successfully merged to master!"

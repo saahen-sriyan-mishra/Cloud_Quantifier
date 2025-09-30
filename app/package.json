@@ -10,9 +10,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "jest",
-    "test:watch": "jest --watch --passWithNoTests",
-    "test:coverage": "jest --coverage --passWithNoTests"
+    "test": "jest --verbose --colors",
+    "test:watch": "jest --watch --verbose --colors",
+    "test:coverage": "jest --coverage --verbose --colors"
   },
   "dependencies": {
     "axios": "^1.12.2",
