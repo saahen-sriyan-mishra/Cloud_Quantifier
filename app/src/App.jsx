@@ -1,11 +1,12 @@
-// app/src/App.jsx
 import React from 'react';
-import Dashboard from './components/Dashboard';
+import Dashboard from './components/dashboard.jsx';
 
-export default function App() {
+function App() {
   return (
     <div>
       <Dashboard />
     </div>
   );
 }
+
+export default App;
