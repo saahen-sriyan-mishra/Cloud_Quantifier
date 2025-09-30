@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   LineChart,
   Line,
@@ -21,6 +21,10 @@ function Dashboard() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [filteredStocks, setFilteredStocks] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  // Refs to track the dropdown and input field
+  const dropdownRef = useRef(null);
+  const inputRef = useRef(null);
 
   // Checkbox state for lines
   const [showLines, setShowLines] = useState({
@@ -109,10 +113,10 @@ function Dashboard() {
 
   // Handle stock selection from dropdown — fetch immediately
   const handleStockSelect = (stock) => {
-    setShowSuggestions(false); // hide dropdown
     setStockName(stock);
     setQuery(stock);
-    fetchStockData(stock); // immediate fetch here to avoid delay
+    fetchStockData(stock);
+    setShowSuggestions(false);
   };
 
   // Tooltip formatters
@@ -134,17 +138,35 @@ function Dashboard() {
     setShowLines((prev) => ({ ...prev, [name]: checked }));
   };
 
+  // Detect click outside dropdown to close it
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && inputRef.current && !inputRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
   return (
     <div style={{ maxWidth: 900, margin: "30px auto", padding: 20, position: "relative" }}>
       <h1>Stock Profile Dashboard</h1>
 
       <form onSubmit={handleSubmit} style={{ marginBottom: 20, position: "relative" }}>
         <input
+          ref={inputRef}
           type="text"
           placeholder="Enter stock name (e.g. AAPL)"
           value={stockName}
           onChange={(e) => setStockName(e.target.value.toUpperCase())}
-          onFocus={() => stockName.length > 0 && setShowSuggestions(true)}
+          onFocus={() => setShowSuggestions(true)}  // Show suggestions when input is focused
+          onBlur={() => { 
+            // Optionally, you could add some delay to hide the dropdown after blur.
+            setTimeout(() => setShowSuggestions(false), 150);
+          }}
           style={{ padding: 8, width: 250, fontSize: 16 }}
         />
         <button
@@ -162,6 +184,7 @@ function Dashboard() {
         {/* Stock Suggestions Dropdown */}
         {showSuggestions && (
           <div
+            ref={dropdownRef}
             style={{
               position: "absolute",
               top: "100%",
@@ -256,18 +279,20 @@ function Dashboard() {
             margin={{ top: 20, right: 40, left: 20, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              angle={-45}
-              textAnchor="end"
-              height={60}
-              tick={{ fontSize: 12 }}
+            <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} tick={{ fontSize: 12 }} />
+            <YAxis
+              yAxisId="left"
+              label={{ value: "Price ($)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }}
             />
-            <YAxis yAxisId="left" label={{ value: "Price ($)", angle: -90, position: "insideLeft", style: { textAnchor: "middle" } }} />
             <YAxis
               yAxisId="right"
               orientation="right"
-              label={{ value: "Volume (x 100k)", angle: 90, position: "insideRight", style: { textAnchor: "middle" } }}
+              label={{
+                value: "Volume (x 100k)",
+                angle: 90,
+                position: "insideRight",
+                style: { textAnchor: "middle" },
+              }}
               tickFormatter={volumeLabelFormatter}
             />
             <Tooltip

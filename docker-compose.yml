@@ -1,31 +1,47 @@
-version: '3.8'
-
 services:
+  database:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.database
+    container_name: stocks-database
+    volumes:
+      - stocks_data:/database
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "sqlite3", "/database/stocks_data.db", "SELECT 1;"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
   app:
     build:
       context: .
       dockerfile: docker/Dockerfile.development
-      target: development  # Specify to use development stage
+      target: development
     container_name: stocks-app
     ports:
       - "3001:3001"
       - "5000:5000"
     volumes:
-      - ./app:/app           # Mount app source code for hot reload
-      - ./database:/database # Mount database directory
-      - /app/node_modules    # Keep container node_modules isolated
-    environment:
-      - DATABASE_PATH=/database/stocks_data.db
-      - NODE_ENV=development
+      - ./app/src:/app/src           # Only mount source code, not node_modules
+      - ./app/index.html:/app/index.html
+      - stocks_data:/shared-data:ro
+    depends_on:
+      database:
+        condition: service_healthy
     networks:
       - app-network
-    # Optional health check
-    healthcheck:
-      test: ["CMD", "node", "-e", "const sqlite3 = require('sqlite3').verbose(); const db = new sqlite3.Database(process.env.DATABASE_PATH, sqlite3.OPEN_READONLY, (err) => { process.exit(err ? 1 : 0); });"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    environment:
+      - DATABASE_PATH=/shared-data/stocks_data.db
+      - NODE_ENV=development
+    restart: unless-stopped
+
+volumes:
+  stocks_data:
+    driver: local
 
 networks:
   app-network:

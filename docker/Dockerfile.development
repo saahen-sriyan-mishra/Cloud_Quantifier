@@ -7,7 +7,7 @@ WORKDIR /app
 COPY app/package*.json ./
 COPY app/vite.config.js ./
 
-# Install all dependencies
+# Install dependencies
 RUN npm install
 
 # Copy source code
@@ -19,17 +19,13 @@ FROM base AS development
 
 # Set environment variables
 ENV NODE_ENV=development
-ENV DATABASE_PATH=/database/stocks_data.db
+ENV DATABASE_PATH=/shared-data/stocks_data.db
 
-# Create database directory
-RUN mkdir -p /database
+# Create shared directory
+RUN mkdir -p /shared-data
 
 # Expose ports
 EXPOSE 3001 5000
-
-# Health check (optional)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "const sqlite3 = require('sqlite3').verbose(); const db = new sqlite3.Database('$DATABASE_PATH', sqlite3.OPEN_READONLY, (err) => { process.exit(err ? 1 : 0); });"
 
 # Start both frontend and backend
 CMD ["npm", "run", "dev"]

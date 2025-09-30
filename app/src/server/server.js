@@ -15,31 +15,66 @@ const PORT = 5000;
 app.use(cors());
 app.use(express.json());
 
-// Database path - now configurable via environment variable
+// Database path - now from environment variable
 const dbPath = process.env.DATABASE_PATH || path.join(__dirname, "../../../../database/stocks_data.db");
 
 console.log("🔍 Looking for database at:", dbPath);
 
-// Connect to SQLite
-const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
-    if (err) {
-        console.error("❌ Failed to connect to database:", err.message);
-        console.error("📁 Database path:", dbPath);
-    } else {
-        console.log("✅ Connected to SQLite database successfully!");
-        // Test query to verify connection
-        db.get("SELECT COUNT(*) as count FROM market_data LIMIT 1", (err, row) => {
+// Connect to SQLite with retry logic for container startup
+function connectDatabase(retries = 5, delay = 3000) {
+    return new Promise((resolve, reject) => {
+        const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
             if (err) {
-                console.error("❌ Test query failed:", err.message);
+                if (retries > 0) {
+                    console.log(`Database connection failed, ${retries} retries left...`);
+                    setTimeout(() => {
+                        connectDatabase(retries - 1, delay).then(resolve).catch(reject);
+                    }, delay);
+                } else {
+                    reject(err);
+                }
             } else {
-                console.log(`📊 Database contains data, sample count: ${row.count}`);
+                console.log("Connected to SQLite database successfully!");
+                resolve(db);
             }
         });
+    });
+}
+
+let db;
+
+// Initialize database connection
+connectDatabase().then(database => {
+    db = database;
+}).catch(err => {
+    console.error("Failed to connect to database after retries:", err.message);
+});
+
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+    if (!db) {
+        return res.status(503).json({ status: "unhealthy", error: "Database not connected" });
     }
+    
+    db.get("SELECT 1 as health", (err) => {
+        if (err) {
+            res.status(500).json({ status: "unhealthy", error: err.message });
+        } else {
+            res.json({ 
+                status: "healthy", 
+                database: "connected",
+                path: dbPath 
+            });
+        }
+    });
 });
 
 // Route: Get rows by stock name
 app.get("/api/data/:name", (req, res) => {
+    if (!db) {
+        return res.status(503).json({ error: "Database not available" });
+    }
+
     const name = req.params.name;
     console.log(`📈 Fetching data for stock: ${name}`);
 
@@ -47,10 +82,10 @@ app.get("/api/data/:name", (req, res) => {
 
     db.all(query, [name], (err, rows) => {
         if (err) {
-            console.error("❌ Query failed:", err.message);
+            console.error("Query failed:", err.message);
             res.status(500).json({ error: err.message });
         } else {
-            console.log(`✅ Found ${rows.length} records for ${name}`);
+            console.log(`Found ${rows.length} records for ${name}`);
             res.json(rows);
         }
     });
@@ -58,6 +93,10 @@ app.get("/api/data/:name", (req, res) => {
 
 // Route: Search for stock names
 app.get("/api/stocks/search", (req, res) => {
+    if (!db) {
+        return res.status(503).json({ error: "Database not available" });
+    }
+
     const query = req.query.q;
     console.log(`🔍 Searching stocks with query: ${query}`);
 
@@ -83,28 +122,17 @@ app.get("/api/stocks/search", (req, res) => {
         [`${query}%`, `%${query}%`, `${query}%`, `%${query}%`], 
         (err, rows) => {
         if (err) {
-            console.error("❌ Search query failed:", err.message);
+            console.error("Search query failed:", err.message);
             res.status(500).json({ error: err.message });
         } else {
             const stockNames = rows.map(row => row.Name);
-            console.log(`✅ Found ${stockNames.length} suggestions for "${query}"`);
+            console.log(`Found ${stockNames.length} suggestions for "${query}"`);
             res.json(stockNames);
         }
     });
 });
 
-// Health check endpoint
-app.get("/api/health", (req, res) => {
-    db.get("SELECT 1 as health", (err) => {
-        if (err) {
-            res.status(500).json({ status: "unhealthy", error: err.message });
-        } else {
-            res.json({ status: "healthy", database: "connected" });
-        }
-    });
-});
-
 app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server is running at http://0.0.0.0:${PORT}`);
-    console.log(`📊 Database path: ${dbPath}`);
+    console.log(`Server is running at http://0.0.0.0:${PORT}`);
+    console.log(`Database path: ${dbPath}`);
 });
