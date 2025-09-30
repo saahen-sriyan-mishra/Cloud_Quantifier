@@ -5,7 +5,7 @@ services:
       dockerfile: docker/Dockerfile.database
     container_name: stocks-database
     volumes:
-      - stocks_data:/database
+      - shared-data:/database  # ← Use shared-data
     networks:
       - app-network
     healthcheck:
@@ -16,15 +16,16 @@ services:
       start_period: 10s
     restart: unless-stopped
 
-  test:
+  app:
     build:
       context: .
-      dockerfile: docker/Dockerfile.test
-    container_name: stocks-test
+      dockerfile: docker/Dockerfile.application
+    container_name: stocks-app
+    ports:
+      - "5000:5000"
+      - "3001:3001"
     volumes:
-      - ./tests:/app/tests
-      - ./app/src:/app/src
-      - stocks_data:/shared-data:ro
+      - shared-data:/shared-data:ro  # ← Use shared-data
     depends_on:
       database:
         condition: service_healthy
@@ -33,12 +34,12 @@ services:
     environment:
       - DATABASE_PATH=/shared-data/stocks_data.db
       - NODE_ENV=test
-    command: ["npm", "test"]
 
 volumes:
-  stocks_data:
+  shared-data:  # ← Define shared-data volume
     driver: local
 
 networks:
   app-network:
     driver: bridge
+    

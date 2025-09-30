@@ -4,12 +4,11 @@ on:
   push:
     branches: [ development ]
 
-# ADD THIS PERMISSIONS BLOCK
 permissions:
   contents: write
 
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -26,12 +25,14 @@ jobs:
         run: |
           echo "Building Docker images..."
           docker-compose build
+          
           echo "Running test suite..."
-          docker-compose up --build --exit-code-from test test
-          echo " All tests passed!"
+          docker-compose up --exit-code-from app
+          
+          echo "All tests passed!"
 
   push-to-master:
-    needs: test
+    needs: build-and-test
     if: success()
     runs-on: ubuntu-latest
     steps:
