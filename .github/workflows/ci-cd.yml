@@ -24,6 +24,10 @@ jobs:
       - name: Build and Test
         run: |
           echo "Building Docker images..."
+          # Copy CI folder contents to root temporarily
+          cp -r CI/* .
+          cp CI/.* . 2>/dev/null || true
+          
           docker-compose build
           
           echo "Running test suite..."
